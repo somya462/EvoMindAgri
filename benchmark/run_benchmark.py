@@ -1,9 +1,9 @@
 import os
 import sys
 import json
+from collections import Counter
 from uuid import uuid4
 
-# Allow imports from project root
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
@@ -67,6 +67,11 @@ def evaluate_response_rules(
     }
 
 
+def norm_val(val):
+    """Normalize stored memory values for deterministic value-level checks."""
+    return str(val).strip().lower()
+
+
 def run_single_case(case, mode):
     """Execute one multi-turn test case under a specified memory mode."""
     owner_id = f"bench_{mode}_{case['id']}_{uuid4().hex[:8]}"
@@ -77,8 +82,8 @@ def run_single_case(case, mode):
     prop_fp = 0
     prop_fn = 0
 
-    # Gold keys expected to be committed to permanent storage (where approve_proposals is True)
-    gold_committed_keys = set()
+    # Stage 2: Multiset (Counter) of all individual approved gold commit events
+    gold_commit_events = Counter()
 
     turn_latencies = []
     turn_prompt_tokens = []
@@ -90,10 +95,12 @@ def run_single_case(case, mode):
         for turn_idx, turn in enumerate(case["turns"]):
             user_msg = turn["user"]
             nlp_analysis = extract_agricultural_entities(user_msg)
-            expected_keys = set(turn.get("expected_proposed_keys", []))
+            expected_keys = turn.get("expected_proposed_keys", [])
+            expected_set = set(expected_keys)
 
             if turn.get("approve_proposals", False):
-                gold_committed_keys |= expected_keys
+                for k in expected_keys:
+                    gold_commit_events[k] += 1
 
             # 1. Memory Ingestion Step by Mode
             if mode == "evomind_governed":
@@ -106,9 +113,9 @@ def run_single_case(case, mode):
                     p["key"] for p in proposals if p.get("success")
                 }
 
-                prop_tp += len(proposed_keys & expected_keys)
-                prop_fp += len(proposed_keys - expected_keys)
-                prop_fn += len(expected_keys - proposed_keys)
+                prop_tp += len(proposed_keys & expected_set)
+                prop_fp += len(proposed_keys - expected_set)
+                prop_fn += len(expected_set - proposed_keys)
 
                 if turn.get("approve_proposals", False):
                     for p in proposals:
@@ -127,9 +134,9 @@ def run_single_case(case, mode):
                         owner_id=owner_id
                     )
                 )
-                prop_tp += len(committed_keys & expected_keys)
-                prop_fp += len(committed_keys - expected_keys)
-                prop_fn += len(expected_keys - committed_keys)
+                prop_tp += len(committed_keys & expected_set)
+                prop_fp += len(committed_keys - expected_set)
+                prop_fn += len(expected_set - committed_keys)
 
             # 2. Construct history (simulate cross-session recall on final turn for stateful modes)
             if (
@@ -168,20 +175,42 @@ def run_single_case(case, mode):
                     must_include_any=turn.get("must_include_any", [])
                 )
 
-        # Stage 2: Inspect actual committed permanent memory collection
-        committed_docs = list(memories_collection.find({"owner_id": owner_id}))
-        actual_committed_keys = {doc["key"] for doc in committed_docs if "key" in doc}
+        # Stage 2A: Event-level persistent commit inspection (active + archived versions)
+        active_docs = list(memories_collection.find({"owner_id": owner_id}))
+        archived_docs = list(memory_versions_collection.find({"owner_id": owner_id}))
+
+        actual_commit_events = Counter()
+        for doc in active_docs:
+            if "key" in doc:
+                actual_commit_events[doc["key"]] += 1
+        for doc in archived_docs:
+            if "key" in doc:
+                actual_commit_events[doc["key"]] += 1
 
         if mode == "stateless":
-            comm_tp, comm_fp, comm_fn = 0, 0, len(gold_committed_keys)
+            comm_tp = 0
+            comm_fp = 0
+            comm_fn = sum(gold_commit_events.values())
         else:
-            comm_tp = len(actual_committed_keys & gold_committed_keys)
-            comm_fp = len(actual_committed_keys - gold_committed_keys)
-            comm_fn = len(gold_committed_keys - actual_committed_keys)
+            all_keys = set(gold_commit_events.keys()) | set(actual_commit_events.keys())
+            comm_tp = sum(min(gold_commit_events[k], actual_commit_events[k]) for k in all_keys)
+            comm_fp = sum(max(0, actual_commit_events[k] - gold_commit_events[k]) for k in all_keys)
+            comm_fn = sum(max(0, gold_commit_events[k] - actual_commit_events[k]) for k in all_keys)
 
-        version_count = memory_versions_collection.count_documents({
-            "owner_id": owner_id
-        })
+        # Stage 2B: Value-level final active-state verification
+        expected_final_state = case.get("expected_final_state", {})
+        active_state_map = {
+            doc["key"]: norm_val(doc.get("value", ""))
+            for doc in active_docs
+            if "key" in doc
+        }
+        state_checks_total = len(expected_final_state)
+        state_checks_passed = sum(
+            1 for k, exp_v in expected_final_state.items()
+            if active_state_map.get(k) == norm_val(exp_v)
+        )
+
+        version_count = len(archived_docs)
 
         return {
             "case_id": case["id"],
@@ -200,7 +229,9 @@ def run_single_case(case, mode):
             "comm_tp": comm_tp,
             "comm_fp": comm_fp,
             "comm_fn": comm_fn,
-            "actual_committed_keys": sorted(list(actual_committed_keys)),
+            "state_checks_passed": state_checks_passed,
+            "state_checks_total": state_checks_total,
+            "active_final_state": active_state_map,
             "archived_versions": version_count,
             "avg_latency_ms": round(
                 sum(turn_latencies) / len(turn_latencies), 2
@@ -251,7 +282,7 @@ def main():
             status = "PASS" if rec["passed"] else "FAIL"
             print(
                 f"  [{status}] {rec['case_id']} ({rec['category']}) | "
-                f"Comm TP/FP/FN: {rec['comm_tp']}/{rec['comm_fp']}/{rec['comm_fn']} | "
+                f"Event TP/FP/FN: {rec['comm_tp']}/{rec['comm_fp']}/{rec['comm_fn']} | "
                 f"Latency: {rec['avg_latency_ms']} ms"
             )
 
@@ -290,6 +321,10 @@ def main():
         c_fn = sum(r["comm_fn"] for r in mode_records)
         comm_prec, comm_rec, comm_f1 = calc_prf(c_tp, c_fp, c_fn)
 
+        s_passed = sum(r["state_checks_passed"] for r in mode_records)
+        s_total = sum(r["state_checks_total"] for r in mode_records)
+        state_acc = round((s_passed / s_total) * 100, 2) if s_total else None
+
         summary[mode] = {
             "overall_pass_rate_pct": round((passed_cases / total_cases) * 100, 2),
             "recall_and_conflict_acc_pct": recall_acc,
@@ -301,6 +336,8 @@ def main():
             "committed_write_precision_pct": None if mode == "stateless" else comm_prec,
             "committed_write_recall_pct": comm_rec,
             "committed_write_f1_pct": comm_f1,
+            "active_state_value_acc_pct": None if mode == "stateless" else state_acc,
+            "active_state_counts": {"passed": s_passed, "total": s_total},
             "committed_counts": {"tp": c_tp, "fp": c_fp, "fn": c_fn},
             "proposal_counts": {"tp": p_tp, "fp": p_fp, "fn": p_fn},
             "archived_versions": sum(r["archived_versions"] for r in mode_records),
@@ -323,7 +360,29 @@ def main():
             indent=2
         )
 
-    print("\nBenchmark complete! Saved updated results_summary.json")
+    out_md = os.path.join(os.path.dirname(__file__), "results_table.md")
+    with open(out_md, "w", encoding="utf-8") as f:
+        f.write("# EvoMindAgri Ablation Benchmark Results\n\n")
+        f.write(
+            "| Metric | Stateless Baseline | Un-gated Auto-Memory | "
+            "EvoMindAgri (Governed) |\n"
+        )
+        f.write("| :--- | :---: | :---: | :---: |\n")
+        rows = [
+            ("Overall Task Pass Rate (%)", f"{summary['stateless']['overall_pass_rate_pct']}", f"{summary['ungated_auto']['overall_pass_rate_pct']}", f"**{summary['evomind_governed']['overall_pass_rate_pct']}**"),
+            ("Recall & Temporal Update Pass Rate (%)", f"{summary['stateless']['recall_and_conflict_acc_pct']}", f"{summary['ungated_auto']['recall_and_conflict_acc_pct']}", f"**{summary['evomind_governed']['recall_and_conflict_acc_pct']}**"),
+            ("Response-Level Lexical Leakage Rate (% $\\downarrow$)", f"{summary['stateless']['response_lexical_leakage_pct']}", f"{summary['ungated_auto']['response_lexical_leakage_pct']}", f"**{summary['evomind_governed']['response_lexical_leakage_pct']}**"),
+            ("Unauthorized Memory Commits in Cat. C–D ($\\downarrow$)", "N/A", f"{summary['ungated_auto']['cat_cd_unauthorized_commits']}", f"**{summary['evomind_governed']['cat_cd_unauthorized_commits']}**"),
+            ("Candidate Proposal F1-Score (%)", "0.0", f"{summary['ungated_auto']['proposal_f1_pct']}", f"**{summary['evomind_governed']['proposal_f1_pct']}**"),
+            ("Committed Memory Write Event F1-Score (%)", "0.0", f"{summary['ungated_auto']['committed_write_f1_pct']}", f"**{summary['evomind_governed']['committed_write_f1_pct']}**"),
+            ("Archived State Versions (Count)", "0", "0", f"**{summary['evomind_governed']['archived_versions']}**"),
+            ("Mean Per-Turn End-to-End Latency (ms $\\downarrow$)", f"{summary['stateless']['mean_latency_ms']}", f"{summary['ungated_auto']['mean_latency_ms']}", f"**{summary['evomind_governed']['mean_latency_ms']}**"),
+            ("Mean Input Prompt Tokens per Turn ($\\downarrow$)", f"{summary['stateless']['mean_prompt_tokens']}", f"{summary['ungated_auto']['mean_prompt_tokens']}", f"**{summary['evomind_governed']['mean_prompt_tokens']}**")
+        ]
+        for label, s_val, u_val, g_val in rows:
+            f.write(f"| {label} | {s_val} | {u_val} | {g_val} |\n")
+
+    print("\nBenchmark complete! Automatically synchronized results_summary.json and results_table.md")
 
 
 if __name__ == "__main__":

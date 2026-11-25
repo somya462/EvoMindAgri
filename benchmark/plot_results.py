@@ -29,12 +29,12 @@ def main():
     })
 
     # ---------------------------------------------------------
-    # FIGURE 1: Task Pass Rate, Recall/Update, Committed Write F1 & Response Leakage
+    # FIGURE 1: Task Pass Rate, Recall/Update, Committed Event F1 & Response Leakage
     # ---------------------------------------------------------
     metrics = [
         ("Overall Task Pass Rate", "overall_pass_rate_pct", "#2b5c8f"),
         ("Recall & Temporal Update Pass Rate", "recall_and_conflict_acc_pct", "#388e3c"),
-        ("Committed Memory Write F1-Score", "committed_write_f1_pct", "#00838f"),
+        ("Committed Write Event F1-Score", "committed_write_f1_pct", "#00838f"),
         ("Response-Level Lexical Leakage (↓)", "response_lexical_leakage_pct", "#c62828")
     ]
 
