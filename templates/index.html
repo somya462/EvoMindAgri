@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EvoMindAgri · Farm intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+  <a class="brand" href="#"><span class="brand-mark">✳</span><span><b>EvoMind<span>Agri</span></b><small>ADAPTIVE FARM INTELLIGENCE</small></span></a>
+  <div class="side-label">WORKSPACE</div>
+  <button class="nav active" data-page="overview"><i>⌂</i> Overview</button>
+  <button class="nav" data-page="assistant"><i>✧</i> AI Assistant</button>
+  <div class="side-label">KNOWLEDGE SYSTEM</div>
+  <button class="nav" data-page="memory"><i>◈</i> Adaptive memory <span class="nav-count" id="pending-pill">0</span></button>
+  <button class="nav" data-page="research"><i>⌁</i> Research & method</button>
+  <div class="side-bottom"><div class="online"><span></span> Local intelligence workspace</div><small>Wheat · Mustard · Haryana</small></div>
+</aside>
+<main class="main">
+<header class="topbar"><div><div class="crumb">EVOMINDAGRI <span>/</span> <b id="crumb">OVERVIEW</b></div><h1 id="heading">Your farm intelligence, evolving.</h1></div><div class="top-right"><span class="db-status" id="db-status">Checking database…</span><div class="avatar">EA</div></div></header>
+
+<section class="page active" id="page-overview">
+ <div class="hero"><div class="hero-copy"><div class="kicker">A MORE CONTEXTUAL WAY TO FARM</div><h2>Knowledge that grows<br>with <em>every season.</em></h2><p>An agricultural assistant that learns from farmer-approved information, preserves its history and brings relevant context into future conversations.</p><button class="primary" data-go="assistant">Start a conversation <span>↗</span></button></div><div class="hero-art"><div class="sun"></div><div class="hill hill-a"></div><div class="hill hill-b"></div><div class="plant">♧</div><div class="hero-note"><b>MEMORY THAT PERSISTS</b><span>Approved records stay in your database.</span></div></div></div>
+ <div class="section-head"><div><div class="eyebrow">YOUR WORKSPACE</div><h2>System snapshot</h2></div><button class="quiet" id="refresh-all">↻ Refresh data</button></div>
+ <div class="metrics">
+  <article class="metric"><div class="metric-icon green">◈</div><span>Approved memories</span><strong id="stat-approved">—</strong><small>Saved permanently in MongoDB</small></article>
+  <article class="metric"><div class="metric-icon amber">◷</div><span>Awaiting your review</span><strong id="stat-pending">—</strong><small>Nothing is saved until approved</small></article>
+  <article class="metric"><div class="metric-icon blue">⌘</div><span>General knowledge</span><strong id="stat-general">—</strong><small>Shared agricultural records</small></article>
+  <article class="metric"><div class="metric-icon purple">↗</div><span>Memory versions</span><strong id="stat-versions">—</strong><small>Previous values are preserved</small></article>
+ </div>
+ <div class="lower-grid"><article class="panel intro-panel"><div class="panel-title"><div><div class="eyebrow">HOW IT WORKS</div><h3>A memory you control</h3></div><span class="chip">FARMER-CENTRIC</span></div><div class="steps"><div><b>01</b><span><strong>Share context</strong><small>Tell the assistant about your crop, field or soil.</small></span></div><div><b>02</b><span><strong>Review the proposal</strong><small>Check what the system wants to remember.</small></span></div><div><b>03</b><span><strong>Approve and retain</strong><small>Approved information is stored in MongoDB and reused when relevant.</small></span></div></div></article>
+ <article class="panel"><div class="panel-title"><div><div class="eyebrow">RECENTLY SAVED</div><h3>Memory timeline</h3></div><button class="text-btn" data-go="memory">View all →</button></div><div id="recent-memories" class="recent-list"><div class="empty">Loading your approved memories…</div></div></article></div>
+</section>
+
+<section class="page" id="page-assistant">
+ <div class="chat-layout"><div class="chat-main panel"><div class="chat-top"><div class="bot-symbol">✳</div><div><h3>EvoMindAgri Assistant</h3><small><span class="pulse"></span> Ready to help with your agricultural questions</small></div><button class="quiet" id="clear-chat">Clear view</button></div>
+ <div id="chat-messages" class="messages"><div class="welcome-chat"><div class="welcome-icon">✳</div><h2>What’s happening<br>on your farm?</h2><p>Ask about wheat, mustard, soil health, irrigation, pests or crop management.</p><div class="suggestions"><button>How should I manage irrigation in wheat?</button><button>What information do you remember about my farm?</button><button>Help me understand soil pH.</button></div></div></div>
+ <form id="chat-form" class="composer"><textarea id="user-input" rows="1" placeholder="Ask your agricultural question…" required></textarea><button class="send" id="send-button" type="submit">↑</button></form><div class="disclaimer">AI guidance can be incomplete. Verify high-risk agricultural decisions with a qualified local expert.</div></div>
+ <aside class="panel chat-aside"><div class="eyebrow">PERSONAL CONTEXT</div><h3>Your approved memory</h3><p>Only approved records from your farmer profile are available to inform relevant answers.</p><div class="memory-mini"><strong id="chat-memory-count">—</strong><span>approved records</span></div><div id="chat-memory-preview" class="mini-list">Loading…</div><button class="outline full" data-go="memory">Manage memory →</button></aside></div>
+</section>
+
+<section class="page" id="page-memory">
+ <div class="memory-banner"><div><div class="kicker">YOUR DATA · YOUR DECISION</div><h2>Adaptive memory</h2><p>Review every proposed memory. Approved records remain in MongoDB across application restarts and browser sessions.</p></div><div class="memory-emblem">◈</div></div>
+ <div class="tabs"><button class="tab active" data-tab="pending">Needs review <span id="tab-pending">0</span></button><button class="tab" data-tab="approved">Approved memories <span id="tab-approved">0</span></button><button class="tab" data-tab="history">Activity log</button></div>
+ <div id="memory-pending" class="memory-content"><div id="pending-list" class="memory-list"></div></div>
+ <div id="memory-approved" class="memory-content" hidden><div id="approved-list" class="memory-list"></div></div>
+ <div id="memory-history" class="memory-content" hidden><div id="audit-list" class="memory-list"></div></div>
+</section>
+
+<section class="page" id="page-research">
+ <div class="memory-banner"><div><div class="kicker">RESEARCH ARCHITECTURE</div><h2>Governed Episodic Farm Memory</h2><p>A human-in-the-loop memory lifecycle engineered to prevent context poisoning and stale state in small-parameter agricultural LLMs.</p></div><div class="memory-emblem">⌁</div></div>
+ <div class="research-grid">
+  <article class="panel">
+   <div class="eyebrow">IMPLEMENTED GOVERNANCE PILLARS</div>
+   <h3>How EvoMindAgri protects memory integrity</h3>
+   <ul class="principles">
+    <li><b>Symbolic Assertion Filtering</b><span>Blocks hypothetical queries, general agronomy questions, and third-party neighbor mentions before memory proposals are created.</span></li>
+    <li><b>Quarantined HITL Approval Gate</b><span>Extracted entities remain isolated in a pending queue and are never injected into LLM context until explicitly approved by the farmer.</span></li>
+    <li><b>Provenance &amp; Version Archival</b><span>Updates to evolving attributes (such as soil pH or irrigation method) preserve prior snapshots in <code>memory_versions</code> alongside an audit log.</span></li>
+    <li><b>Temporal Validity &amp; Safety Guardrails</b><span>Enforces validity windows and soil-chemistry constraints (e.g., elemental sulfur vs. agricultural lime) during response generation.</span></li>
+   </ul>
+  </article>
+  <article class="panel">
+   <div class="eyebrow">SYSTEM PIPELINE &amp; EVALUATION</div>
+   <h3>Current Build Capabilities</h3>
+   <p class="research-copy">This implementation integrates a deterministic <b>spaCy EntityRuler</b> agricultural NLU pipeline, a <b>MongoDB</b> versioned memory store, and local inference via <b>Ollama (Qwen2.5:3B)</b>.</p>
+   <p class="research-copy"><b>Empirical Benchmark:</b> Evaluated across multi-turn recall, temporal update, context-poisoning trap, and safety scenarios against stateless and un-gated auto-memory baselines.</p>
+  </article>
+ </div>
+</section>
+<footer>EVOMINDAGRI <span>·</span> Adaptive agricultural intelligence <span>·</span> Your approved memories remain yours.</footer>
+</main></div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body></html>
