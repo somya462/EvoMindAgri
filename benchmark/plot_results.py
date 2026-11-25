@@ -29,13 +29,13 @@ def main():
     })
 
     # ---------------------------------------------------------
-    # FIGURE 1: Task Pass Rate, Recall/Update, Write F1 & Response Leakage
+    # FIGURE 1: Task Pass Rate, Recall/Update, Committed Write F1 & Response Leakage
     # ---------------------------------------------------------
     metrics = [
         ("Overall Task Pass Rate", "overall_pass_rate_pct", "#2b5c8f"),
         ("Recall & Temporal Update Pass Rate", "recall_and_conflict_acc_pct", "#388e3c"),
-        ("Memory Write F1-Score", "memory_write_f1_pct", "#00838f"),
-        ("Response-Level Lexical Leakage (↓)", "context_poisoning_rate_pct", "#c62828")
+        ("Committed Memory Write F1-Score", "committed_write_f1_pct", "#00838f"),
+        ("Response-Level Lexical Leakage (↓)", "response_lexical_leakage_pct", "#c62828")
     ]
 
     x = np.arange(len(mode_labels))
@@ -104,7 +104,7 @@ def main():
         edgecolor="black",
         linewidth=0.6
     )
-    ax1.set_title("Mean End-to-End Latency (↓)")
+    ax1.set_title("Mean Per-Turn End-to-End Latency (↓)")
     ax1.set_ylabel("Latency (ms)")
     ax1.set_ylim(0, max(latencies) * 1.2)
     ax1.grid(axis="y", linestyle="--", alpha=0.45)

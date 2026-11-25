@@ -48,7 +48,6 @@ def evaluate_response_rules(
     inc_hits = sum(1 for kw in must_include if kw.lower() in text_lower)
     inc_total = len(must_include)
 
-    any_hit = True
     if must_include_any:
         any_hit = any(kw.lower() in text_lower for kw in must_include_any)
         inc_total += 1
@@ -73,9 +72,13 @@ def run_single_case(case, mode):
     owner_id = f"bench_{mode}_{case['id']}_{uuid4().hex[:8]}"
     history = []
 
-    tp_proposals = 0
-    fp_proposals = 0
-    fn_proposals = 0
+    # Stage 1: Candidate proposal screening counts
+    prop_tp = 0
+    prop_fp = 0
+    prop_fn = 0
+
+    # Gold keys expected to be committed to permanent storage (where approve_proposals is True)
+    gold_committed_keys = set()
 
     turn_latencies = []
     turn_prompt_tokens = []
@@ -89,6 +92,9 @@ def run_single_case(case, mode):
             nlp_analysis = extract_agricultural_entities(user_msg)
             expected_keys = set(turn.get("expected_proposed_keys", []))
 
+            if turn.get("approve_proposals", False):
+                gold_committed_keys |= expected_keys
+
             # 1. Memory Ingestion Step by Mode
             if mode == "evomind_governed":
                 proposals = propose_memories_from_analysis(
@@ -100,9 +106,9 @@ def run_single_case(case, mode):
                     p["key"] for p in proposals if p.get("success")
                 }
 
-                tp_proposals += len(proposed_keys & expected_keys)
-                fp_proposals += len(proposed_keys - expected_keys)
-                fn_proposals += len(expected_keys - proposed_keys)
+                prop_tp += len(proposed_keys & expected_keys)
+                prop_fp += len(proposed_keys - expected_keys)
+                prop_fn += len(expected_keys - proposed_keys)
 
                 if turn.get("approve_proposals", False):
                     for p in proposals:
@@ -121,18 +127,15 @@ def run_single_case(case, mode):
                         owner_id=owner_id
                     )
                 )
-                # In ungated mode, any non-expected committed key counts as FP
-                tp_proposals += len(committed_keys & expected_keys)
-                fp_proposals += len(committed_keys - expected_keys)
-                fn_proposals += len(expected_keys - committed_keys)
+                prop_tp += len(committed_keys & expected_keys)
+                prop_fp += len(committed_keys - expected_keys)
+                prop_fn += len(expected_keys - committed_keys)
 
-            # 2. Construct history (for stateless, keep full window;
-            #    for memory modes, simulate cross-session recall on final turn)
+            # 2. Construct history (simulate cross-session recall on final turn for stateful modes)
             if (
                 mode in ("evomind_governed", "ungated_auto")
                 and turn_idx == len(case["turns"]) - 1
             ):
-                # Simulate new session where only long-term memory persists
                 active_history = [{"role": "user", "content": user_msg}]
             else:
                 history.append({"role": "user", "content": user_msg})
@@ -165,7 +168,17 @@ def run_single_case(case, mode):
                     must_include_any=turn.get("must_include_any", [])
                 )
 
-        # Check version count for temporal_update cases
+        # Stage 2: Inspect actual committed permanent memory collection
+        committed_docs = list(memories_collection.find({"owner_id": owner_id}))
+        actual_committed_keys = {doc["key"] for doc in committed_docs if "key" in doc}
+
+        if mode == "stateless":
+            comm_tp, comm_fp, comm_fn = 0, 0, len(gold_committed_keys)
+        else:
+            comm_tp = len(actual_committed_keys & gold_committed_keys)
+            comm_fp = len(actual_committed_keys - gold_committed_keys)
+            comm_fn = len(gold_committed_keys - actual_committed_keys)
+
         version_count = memory_versions_collection.count_documents({
             "owner_id": owner_id
         })
@@ -181,9 +194,13 @@ def run_single_case(case, mode):
                 final_eval["exc_violations"] if final_eval else 0
             ),
             "exc_total": final_eval["exc_total"] if final_eval else 0,
-            "tp": tp_proposals,
-            "fp": fp_proposals,
-            "fn": fn_proposals,
+            "prop_tp": prop_tp,
+            "prop_fp": prop_fp,
+            "prop_fn": prop_fn,
+            "comm_tp": comm_tp,
+            "comm_fp": comm_fp,
+            "comm_fn": comm_fn,
+            "actual_committed_keys": sorted(list(actual_committed_keys)),
             "archived_versions": version_count,
             "avg_latency_ms": round(
                 sum(turn_latencies) / len(turn_latencies), 2
@@ -198,6 +215,16 @@ def run_single_case(case, mode):
 
     finally:
         cleanup_owner_records(owner_id)
+
+
+def calc_prf(tp, fp, fn):
+    precision = round((tp / (tp + fp)) * 100, 2) if (tp + fp) else 0.0
+    recall = round((tp / (tp + fn)) * 100, 2) if (tp + fn) else 0.0
+    f1 = (
+        round((2 * precision * recall) / (precision + recall), 2)
+        if (precision + recall) else 0.0
+    )
+    return precision, recall, f1
 
 
 def main():
@@ -224,24 +251,24 @@ def main():
             status = "PASS" if rec["passed"] else "FAIL"
             print(
                 f"  [{status}] {rec['case_id']} ({rec['category']}) | "
-                f"Latency: {rec['avg_latency_ms']} ms | "
-                f"Prompt Tokens: {rec['avg_prompt_tokens']}"
+                f"Comm TP/FP/FN: {rec['comm_tp']}/{rec['comm_fp']}/{rec['comm_fn']} | "
+                f"Latency: {rec['avg_latency_ms']} ms"
             )
 
         total_cases = len(mode_records)
         passed_cases = sum(1 for r in mode_records if r["passed"])
 
-        # Category-specific metrics
         poison_cases = [
             r for r in mode_records
             if r["category"] in ("poisoning_trap", "unapproved_isolation")
         ]
         poison_violations = sum(r["exc_violations"] for r in poison_cases)
         poison_checks = sum(r["exc_total"] for r in poison_cases)
-        poison_rate = (
+        leakage_rate = (
             round((poison_violations / poison_checks) * 100, 2)
             if poison_checks else 0.0
         )
+        cat_cd_committed_fp = sum(r["comm_fp"] for r in poison_cases)
 
         recall_cases = [
             r for r in mode_records
@@ -253,24 +280,30 @@ def main():
             if recall_cases else 0.0
         )
 
-        tp = sum(r["tp"] for r in mode_records)
-        fp = sum(r["fp"] for r in mode_records)
-        fn = sum(r["fn"] for r in mode_records)
+        p_tp = sum(r["prop_tp"] for r in mode_records)
+        p_fp = sum(r["prop_fp"] for r in mode_records)
+        p_fn = sum(r["prop_fn"] for r in mode_records)
+        prop_prec, prop_rec, prop_f1 = calc_prf(p_tp, p_fp, p_fn)
 
-        precision = round((tp / (tp + fp)) * 100, 2) if (tp + fp) else 0.0
-        recall = round((tp / (tp + fn)) * 100, 2) if (tp + fn) else 0.0
-        f1 = (
-            round((2 * precision * recall) / (precision + recall), 2)
-            if (precision + recall) else 0.0
-        )
+        c_tp = sum(r["comm_tp"] for r in mode_records)
+        c_fp = sum(r["comm_fp"] for r in mode_records)
+        c_fn = sum(r["comm_fn"] for r in mode_records)
+        comm_prec, comm_rec, comm_f1 = calc_prf(c_tp, c_fp, c_fn)
 
         summary[mode] = {
             "overall_pass_rate_pct": round((passed_cases / total_cases) * 100, 2),
             "recall_and_conflict_acc_pct": recall_acc,
-            "context_poisoning_rate_pct": poison_rate,
-            "memory_write_precision_pct": precision,
-            "memory_write_recall_pct": recall,
-            "memory_write_f1_pct": f1,
+            "response_lexical_leakage_pct": leakage_rate,
+            "cat_cd_unauthorized_commits": None if mode == "stateless" else cat_cd_committed_fp,
+            "proposal_precision_pct": None if mode == "stateless" else prop_prec,
+            "proposal_recall_pct": prop_rec,
+            "proposal_f1_pct": prop_f1,
+            "committed_write_precision_pct": None if mode == "stateless" else comm_prec,
+            "committed_write_recall_pct": comm_rec,
+            "committed_write_f1_pct": comm_f1,
+            "committed_counts": {"tp": c_tp, "fp": c_fp, "fn": c_fn},
+            "proposal_counts": {"tp": p_tp, "fp": p_fp, "fn": p_fn},
+            "archived_versions": sum(r["archived_versions"] for r in mode_records),
             "mean_latency_ms": round(
                 sum(r["avg_latency_ms"] for r in mode_records) / total_cases, 2
             ),
@@ -290,33 +323,7 @@ def main():
             indent=2
         )
 
-    out_md = os.path.join(os.path.dirname(__file__), "results_table.md")
-    with open(out_md, "w", encoding="utf-8") as f:
-        f.write("# EvoMindAgri Ablation Benchmark Results\n\n")
-        f.write(
-            "| Metric | Stateless Baseline | Un-gated Auto-Memory | "
-            "EvoMindAgri (Governed) |\n"
-        )
-        f.write("| :--- | :---: | :---: | :---: |\n")
-        metrics_map = [
-            ("Overall Task Pass Rate (%)", "overall_pass_rate_pct"),
-            ("Cross-Session Recall & Update Accuracy (%)", "recall_and_conflict_acc_pct"),
-            ("Context Poisoning Rate (% $\\downarrow$)", "context_poisoning_rate_pct"),
-            ("Memory Write Precision (%)", "memory_write_precision_pct"),
-            ("Memory Write Recall (%)", "memory_write_recall_pct"),
-            ("Memory Write F1-Score (%)", "memory_write_f1_pct"),
-            ("Mean End-to-End Latency (ms $\\downarrow$)", "mean_latency_ms"),
-            ("Mean Prompt Tokens ($\\downarrow$)", "mean_prompt_tokens")
-        ]
-        for label, key in metrics_map:
-            f.write(
-                f"| {label} | "
-                f"{summary['stateless'][key]} | "
-                f"{summary['ungated_auto'][key]} | "
-                f"{summary['evomind_governed'][key]} |\n"
-            )
-
-    print("\nBenchmark complete! Saved results_summary.json and results_table.md")
+    print("\nBenchmark complete! Saved updated results_summary.json")
 
 
 if __name__ == "__main__":
