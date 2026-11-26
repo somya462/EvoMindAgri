@@ -10,11 +10,8 @@ from database import (
     memory_audit_collection
 )
 
-
-# --------------------------------------------------
 # Agronomic Temporal Validity Rules (in days)
 # None = persistent until explicitly updated
-# --------------------------------------------------
 
 CATEGORY_TTL_DAYS = {
     "crop_health": 30,    # Transient disease/pest reports decay after 30 days
@@ -24,10 +21,7 @@ CATEGORY_TTL_DAYS = {
     "farm_profile": None  # Persistent farm location / area
 }
 
-
-# --------------------------------------------------
 # Utility functions
-# --------------------------------------------------
 
 def current_time():
     return datetime.now(timezone.utc)
@@ -71,9 +65,7 @@ def serialize_document(document):
     return document
 
 
-# --------------------------------------------------
 # Database indexes
-# --------------------------------------------------
 
 def initialize_memory_indexes():
     """Create indexes for efficient memory retrieval."""
@@ -105,9 +97,7 @@ def initialize_memory_indexes():
     )
 
 
-# --------------------------------------------------
 # 1. Create a memory proposal
-# --------------------------------------------------
 
 def create_memory_proposal(
     key,
@@ -184,9 +174,7 @@ def create_memory_proposal(
     }
 
 
-# --------------------------------------------------
 # 2. Retrieve memory proposals
-# --------------------------------------------------
 
 def get_memory_proposals(status="pending", owner_id=None):
     """Retrieve proposals, optionally filtered by status and owner."""
@@ -209,9 +197,7 @@ def get_memory_proposals(status="pending", owner_id=None):
     return [serialize_document(p) for p in proposals]
 
 
-# --------------------------------------------------
 # 3. Approve a memory proposal
-# --------------------------------------------------
 
 def approve_memory_proposal(
     proposal_id,
@@ -371,9 +357,8 @@ def approve_memory_proposal(
     }
 
 
-# --------------------------------------------------
 # 4. Reject a memory proposal
-# --------------------------------------------------
+
 
 def reject_memory_proposal(
     proposal_id,
@@ -448,9 +433,7 @@ def reject_memory_proposal(
     }
 
 
-# --------------------------------------------------
 # 5. Retrieve approved & non-expired memories
-# --------------------------------------------------
 
 def retrieve_memories(
     owner_id=None,
@@ -518,9 +501,7 @@ def retrieve_memories(
     return results
 
 
-# --------------------------------------------------
 # 6. Retrieve memory version history
-# --------------------------------------------------
 
 def get_memory_versions(memory_id):
     """Return previous versions of a memory."""
@@ -532,9 +513,7 @@ def get_memory_versions(memory_id):
     return [serialize_document(v) for v in versions]
 
 
-# --------------------------------------------------
 # 7. Candidate Extraction Helper
-# --------------------------------------------------
 
 def _extract_memory_candidates(text, analysis):
     """Extract structured candidate key-value records from NLP analysis."""
@@ -672,9 +651,7 @@ def is_direct_farmer_assertion(text):
     return any(phrase in text_lower for phrase in personal_indicators)
 
 
-# --------------------------------------------------
 # 8. AUTOMATIC MEMORY PROPOSAL EXTRACTION (GOVERNED)
-# --------------------------------------------------
 
 def propose_memories_from_analysis(
     text,
@@ -734,9 +711,7 @@ def propose_memories_from_analysis(
     return results
 
 
-# --------------------------------------------------
-# 9. UNGATED AUTO-MEMORY BASELINE (FOR ABLATION STUDY)
-# --------------------------------------------------
+# 9. UNGATED AUTO-MEMORY BASELINE
 
 def auto_commit_ungated_memories(
     text,
@@ -789,9 +764,7 @@ def auto_commit_ungated_memories(
     return committed
 
 
-# --------------------------------------------------
 # 10. MEMORY DASHBOARD STATISTICS
-# --------------------------------------------------
 
 def get_memory_statistics(owner_id=None):
 
@@ -840,10 +813,7 @@ def get_memory_statistics(owner_id=None):
         "total": approved + general
     }
 
-
-# --------------------------------------------------
 # 11. GET APPROVED MEMORIES FOR DASHBOARD
-# --------------------------------------------------
 
 def get_all_approved_memories(owner_id=None, limit=100):
 
@@ -867,9 +837,7 @@ def get_all_approved_memories(owner_id=None, limit=100):
     ]
 
 
-# --------------------------------------------------
 # 12. GET MEMORY AUDIT LOGS
-# --------------------------------------------------
 
 def get_memory_audit_logs(owner_id=None, limit=100):
 

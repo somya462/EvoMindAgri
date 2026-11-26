@@ -28,9 +28,7 @@ def main():
         "axes.labelsize": 10
     })
 
-    # ---------------------------------------------------------
     # FIGURE 1: Task Pass Rate, Recall/Update, Committed Event F1 & Response Leakage
-    # ---------------------------------------------------------
     metrics = [
         ("Overall Task Pass Rate", "overall_pass_rate_pct", "#2b5c8f"),
         ("Recall & Temporal Update Pass Rate", "recall_and_conflict_acc_pct", "#388e3c"),
@@ -88,9 +86,7 @@ def main():
     plt.savefig(fig1_path, dpi=300, bbox_inches="tight")
     plt.close()
 
-    # ---------------------------------------------------------
     # FIGURE 2: Latency & Input Prompt Token Efficiency
-    # ---------------------------------------------------------
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.5, 3.8), dpi=300)
 
     colors = ["#78909c", "#ef6c00", "#2e7d32"]

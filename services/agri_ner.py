@@ -4,10 +4,7 @@ import re
 
 from spacy.pipeline import EntityRuler
 
-
-# --------------------------------------------------
 # 1. INITIALIZE NLP MODEL
-# --------------------------------------------------
 
 nlp = spacy.blank("en")
 
@@ -16,10 +13,7 @@ ruler = nlp.add_pipe(
     config={"phrase_matcher_attr": "LOWER"}
 )
 
-
-# --------------------------------------------------
 # 2. AGRICULTURAL ENTITY DICTIONARY
-# --------------------------------------------------
 
 AGRI_TERMS = {
 
@@ -89,10 +83,7 @@ AGRI_TERMS = {
     ]
 }
 
-
-# --------------------------------------------------
 # 3. REGISTER AGRICULTURAL ENTITIES
-# --------------------------------------------------
 
 patterns = []
 
@@ -107,10 +98,7 @@ for label, terms in AGRI_TERMS.items():
 
 ruler.add_patterns(patterns)
 
-
-# --------------------------------------------------
 # 4. AGRICULTURAL INTENT CLASSIFICATION
-# --------------------------------------------------
 
 INTENT_KEYWORDS = {
 
@@ -187,10 +175,7 @@ def classify_intent(text):
     return best_intent
 
 
-
-# --------------------------------------------------
 # 5. EXTRACT NUMERICAL AGRICULTURAL VALUES
-# --------------------------------------------------
 
 def extract_measurements(text):
 
@@ -236,9 +221,7 @@ def extract_measurements(text):
     return measurements
 
 
-# --------------------------------------------------
 # 6. MAIN ENTITY EXTRACTION FUNCTION
-# --------------------------------------------------
 
 def extract_agricultural_entities(text):
 
@@ -271,9 +254,7 @@ def extract_agricultural_entities(text):
     }
 
 
-# --------------------------------------------------
 # 7. TESTING
-# --------------------------------------------------
 
 if __name__ == "__main__":
 

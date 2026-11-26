@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template, request, jsonify, session
 
 from datetime import datetime, timezone, timedelta
@@ -47,19 +46,14 @@ def make_session_persistent():
     session.permanent = True
 
 
-
-# -----------------------------------------------
-# HOME
-# -----------------------------------------------
+# HOME PAGE
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
-# -----------------------------------------------
 # CHAT API
-# -----------------------------------------------
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
@@ -74,16 +68,10 @@ def chat():
         }), 400
 
     try:
-
-        # ---------------------------------------
         # 1. CHECK MONGODB CONNECTION
-        # ---------------------------------------
-
         client.admin.command("ping")
 
-        # ---------------------------------------
         # 2. GET OR CREATE CONVERSATION ID
-        # ---------------------------------------
 
         conversation_id = session.get("conversation_id")
 
@@ -93,9 +81,7 @@ def chat():
 
             session["conversation_id"] = conversation_id
 
-        # ---------------------------------------
         # 3. GET OR CREATE FARMER ID
-        # ---------------------------------------
 
         farmer_id = session.get("farmer_id")
 
@@ -105,17 +91,13 @@ def chat():
 
             session["farmer_id"] = farmer_id
 
-        # ---------------------------------------
         # 4. AGRICULTURAL NLP ANALYSIS
-        # ---------------------------------------
 
         nlp_analysis = extract_agricultural_entities(
             user_message
         )
 
-        # ---------------------------------------
         # 5. SAVE USER MESSAGE + NLP ANALYSIS
-        # ---------------------------------------
 
         user_message_result = messages_collection.insert_one({
 
@@ -133,9 +115,7 @@ def chat():
 
         })
 
-        # ---------------------------------------
         # 6. AUTOMATIC MEMORY PROPOSAL EXTRACTION
-        # ---------------------------------------
 
         memory_proposals = []
 
@@ -166,9 +146,7 @@ def chat():
                 "Automatic memory extraction failed"
             )
 
-        # ---------------------------------------
         # 7. RETRIEVE CONVERSATION HISTORY
-        # ---------------------------------------
 
         history = list(
 
@@ -192,9 +170,7 @@ def chat():
 
         history.reverse()
 
-        # ---------------------------------------
         # 8. GENERATE INTELLIGENT RESPONSE
-        # ---------------------------------------
 
         answer = generate_response(
 
@@ -205,9 +181,7 @@ def chat():
 
         )
 
-        # ---------------------------------------
         # 9. SAVE ASSISTANT RESPONSE
-        # ---------------------------------------
 
         messages_collection.insert_one({
 
@@ -223,9 +197,7 @@ def chat():
 
         })
 
-        # ---------------------------------------
         # 10. RETURN API RESPONSE
-        # ---------------------------------------
 
         return jsonify({
 
@@ -257,10 +229,7 @@ def chat():
         }), 500
 
 
-
-# -----------------------------------------------
 # MEMORY DASHBOARD - STATISTICS
-# -----------------------------------------------
 
 @app.route("/api/memory/stats")
 def memory_stats():
@@ -288,9 +257,7 @@ def memory_stats():
         }), 500
 
 
-# -----------------------------------------------
 # MEMORY DASHBOARD - PENDING PROPOSALS
-# -----------------------------------------------
 
 @app.route("/api/memory/proposals")
 def memory_proposals_api():
@@ -321,9 +288,7 @@ def memory_proposals_api():
         }), 500
 
 
-# -----------------------------------------------
 # MEMORY DASHBOARD - APPROVED MEMORIES
-# -----------------------------------------------
 
 @app.route("/api/memory/approved")
 def approved_memories_api():
@@ -353,9 +318,7 @@ def approved_memories_api():
         }), 500
 
 
-# -----------------------------------------------
 # MEMORY DASHBOARD - APPROVE PROPOSAL
-# -----------------------------------------------
 
 @app.route(
     "/api/memory/approve/<proposal_id>",
@@ -388,9 +351,7 @@ def approve_memory_api(proposal_id):
         }), 500
 
 
-# -----------------------------------------------
 # MEMORY DASHBOARD - REJECT PROPOSAL
-# -----------------------------------------------
 
 @app.route(
     "/api/memory/reject/<proposal_id>",
@@ -426,9 +387,7 @@ def reject_memory_api(proposal_id):
         }), 500
 
 
-# -----------------------------------------------
 # MEMORY DASHBOARD - VERSION HISTORY
-# -----------------------------------------------
 
 @app.route("/api/memory/versions/<memory_id>")
 def memory_versions_api(memory_id):
@@ -439,8 +398,7 @@ def memory_versions_api(memory_id):
                 "error": "Farmer session not found."
             }), 401
 
-        # Verify that the requested memory belongs
-        # to this farmer or is general knowledge.
+        # Verify that the requested memory belongs to this farmer or is general knowledge.
         memories = get_all_approved_memories(
             owner_id=session["farmer_id"]
         )
@@ -469,9 +427,7 @@ def memory_versions_api(memory_id):
         }), 500
 
 
-# -----------------------------------------------
 # MEMORY DASHBOARD - AUDIT LOGS
-# -----------------------------------------------
 
 @app.route("/api/memory/audit")
 def memory_audit_api():
@@ -501,9 +457,7 @@ def memory_audit_api():
         }), 500
 
 
-# -----------------------------------------------
 # HEALTH CHECK
-# -----------------------------------------------
 
 @app.route("/health")
 def health():
@@ -529,9 +483,7 @@ def health():
     })
 
 
-# -----------------------------------------------
 # RUN APPLICATION
-# -----------------------------------------------
 
 if __name__ == "__main__":
 

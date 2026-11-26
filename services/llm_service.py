@@ -112,9 +112,7 @@ def generate_response(
     start_time = time.perf_counter()
 
     try:
-        # -----------------------------------------
         # 1. IDENTIFY LATEST USER QUESTION & INDEX
-        # -----------------------------------------
         latest_question = None
         latest_user_idx = None
 
@@ -128,9 +126,7 @@ def generate_response(
         if not latest_question:
             raise ValueError("No user question found.")
 
-        # -----------------------------------------
         # 2. POPULATE SHORT-TERM CONVERSATION HISTORY
-        # -----------------------------------------
         previous_messages = []
         for idx, msg in enumerate(conversation_history):
             if idx == latest_user_idx:
@@ -143,9 +139,7 @@ def generate_response(
                     "content": content
                 })
 
-        # -----------------------------------------
         # 3. PREPARE NLP CONTEXT
-        # -----------------------------------------
         if nlp_analysis is None:
             nlp_analysis = extract_agricultural_entities(latest_question)
 
@@ -155,9 +149,7 @@ def generate_response(
             ensure_ascii=False
         )
 
-        # -----------------------------------------
         # 4. RETRIEVE MEMORIES BY EXPERIMENTAL MODE
-        # -----------------------------------------
         farmer_memories = []
         general_memories = []
 
@@ -206,9 +198,7 @@ def generate_response(
             ensure_ascii=False
         )
 
-        # -----------------------------------------
         # 5. CONSTRUCT OLLAMA MESSAGES
-        # -----------------------------------------
         messages = [
             {
                 "role": "system",
@@ -291,9 +281,7 @@ INSTRUCTIONS:
             "content": current_prompt
         })
 
-        # -----------------------------------------
         # 6. GENERATE RESPONSE USING OLLAMA
-        # -----------------------------------------
         response = ollama.chat(
             model=Config.OLLAMA_MODEL,
             messages=messages,
