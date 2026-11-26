@@ -6,14 +6,6 @@ By decoupling natural-language response generation from persistent state managem
 
 ---
 
-## Research Paper Scope vs. Extended Application Features
-
-> **Research Paper Scope:** The accompanying research manuscript (*"EvoMindAgri: A Deterministic Entity-Governed Memory Architecture for Reliable Longitudinal Agricultural Advisory Agents"*) evaluates the deterministic write-time memory-governance pipeline using a controlled 25-scenario multi-turn agricultural benchmark (`benchmark/dataset_haryana_agri.json`). During benchmark execution, candidate memory proposals passing the deterministic governance gate are committed via the automated benchmark oracle (`approve_proposals: true` for valid declarative turns) so that the symbolic write gate and oracle-approved persistence lifecycle are evaluated repeatably.
->
-> **Extended Application Capabilities:** Beyond the core deterministic gate evaluated in the manuscript, this repository also includes broader application-level capabilities—including an interactive pending proposal queue (`memory_proposals`), farmer approval/rejection endpoints (`approve_memory_proposal`), temporal validity metadata, and user-facing interface components. These extended features form part of the end-to-end application implementation and should not be interpreted as independently evaluated human-usability claims of the reported benchmark.
-
----
-
 ## Core Architecture
 
 1. **Assertion & Hypothesis Screening (`services/memory_service.py`):** Uses predefined lexical exclusion patterns to filter selected hypothetical, negated, and third-party references alongside first-person ownership indicators to identify farmer-specific declarative assertions.
@@ -88,18 +80,4 @@ cp .env.example .env
 ollama pull qwen2.5:3b
 python benchmark/run_benchmark.py
 python benchmark/plot_results.py
-```
-
----
-
-## Citation
-
-```bibtex
-@article{somya2026evomindagri,
-  title={EvoMindAgri: A Deterministic Entity-Governed Memory Architecture for Reliable Longitudinal Agricultural Advisory Agents},
-  author={Somya},
-  journal={Computers and Electronics in Agriculture},
-  year={2026},
-  note={Under review}
-}
 ```
